@@ -12,12 +12,13 @@ import logging
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher(bot)
    
-btn_post = InlineKeyboardButton('Опубликовать', callback_data='post_comment')
-btn_del = InlineKeyboardButton('Удалить', callback_data='delete_comment')
-btn_like = InlineKeyboardButton('Поставить лайк', callback_data='like')
+btn_open = InlineKeyboardButton('Открыть', callback_data='open')
+btn_close = InlineKeyboardButton('Закрыть пост', callback_data='close')
+btn_del = InlineKeyboardButton('Удалить комментарий', callback_data='delete')
+btn_res =  InlineKeyboardButton('Восстановить коммент', callback_data='restore')
 
-MENU_ACTION = InlineKeyboardMarkup().add(btn_post)
-DEL_COMMENT = InlineKeyboardMarkup().add(btn_del)
+MENU = InlineKeyboardMarkup().add(btn_open, btn_close, btn_del, btn_res)
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -55,6 +56,8 @@ def link_transform(link):
     print(res_id)
     return res_id
 
+def vk_actions(data):
+    
 
 @dp.message_handler(commands=['start'])
 async def welcome_msg(message: types.Message):
@@ -66,7 +69,7 @@ async def welcome_msg(message: types.Message):
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
-@dp.message_handler()
+@dp.message_handler(Text(startswith='http'))
 async def input_link(message: types.Message):
     if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
         link = link_transform(message.text)
@@ -75,15 +78,15 @@ async def input_link(message: types.Message):
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
-@dp.callback_query_handler(text=['open_post','close_post'])
+@dp.callback_query_handler(text=['open','close'])
 async def process_callback(call: types.CallbackQuery):
-    if call.data == 'open_post':
+    if call.data == 'open':
         print(res_id)
-        api.wall.openComments(owner_id = res_id[0], post_id = res_id[1])
+        vk.api.wall.openComments(owner_id = res_id[0], post_id = res_id[1])
         await call.message.answer(text='Пост Радия Хабирова открыт!')
-    if call.data == 'close_post':
+    if call.data == 'close':
         print(res_id)
-        api.wall.closeComments(owner_id = res_id[0], post_id = res_id[1])
+        vk.api.wall.closeComments(owner_id = res_id[0], post_id = res_id[1])
         await call.message.answer(text='Пост Радия Хабирова закрыт!')
 
 if __name__ == '__main__':
