@@ -18,8 +18,9 @@ btn_open = InlineKeyboardButton('Открыть пост', callback_data='open')
 btn_close = InlineKeyboardButton('Закрыть пост', callback_data='close')
 btn_del = InlineKeyboardButton('Удалить комментарий', callback_data='delete')
 btn_res =  InlineKeyboardButton('Восстановить коммент', callback_data='restore')
+btn_reboot = InlineKeyboardButton('Отправить другую ссылку', callback_data='reboot')
 
-MENU = InlineKeyboardMarkup().add(btn_open, btn_close, btn_del, btn_res)
+MENU = InlineKeyboardMarkup().add(btn_open, btn_close, btn_del, btn_res, btn_reboot)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -68,52 +69,77 @@ def vk_close(data):
     else:
         False
 
+def vk_delete(data):
+    if vk_api.wall.deleteComment(owner_id = data[0], comment_id = data[2]):
+        return True
+    else:
+        False
+
+def vk_restore(data):
+    if vk_api.wall.restoreComment(owner_id = data[0], comment_id = data[2]):
+        return True
+    else:
+        False
+
 class MessageData(StatesGroup):
 
     link = State()
     fin = State()
 
 @dp.message_handler(commands=['start'])
-async def welcome_msg(message: types.Message, state = FSMContext):
+async def welcome_msg(message: types.Message):
     if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
-        await MessageData.link.set()
         await bot.send_message(message.from_user.id, text='''Бот умеет открывать, закрывать, удалять и восстанавливать комментарии на следующих страницах Вконтакте:\n 
 Радий Хабиров\n
 Администрация Главы РБ\n
 ЦУР Башкортостан\n\nОтправьте ссылку в ответ, чтобы открыть или закрыть пост''')
+        await MessageData.link.set()
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
-@dp.message_handler(Text(startswith='http'),state=MessageData.link)
-async def input_link(message: types.Message, state: FSMContext):
+@dp.message_handler(Text(startswith='http'), state = MessageData.link)
+async def input_link(message: types.Message, state = FSMContext):
     if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
         async with state.proxy() as data:
             data['link'] = message.text
+        await message.answer(text= 'Что сделать?', reply_markup=MENU)
         await MessageData.next()
-        await message.answer(text= 'Что сделать?',reply_markup=MENU)
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
-@dp.callback_query_handler(text=['open','close', 'delete', 'restore'], state = MessageData.fin)
-async def process_callback(call: types.CallbackQuery,state = FSMContext ):
+@dp.callback_query_handler(text=['open','close', 'delete', 'restore', 'reboot'], state = MessageData.fin)
+async def process_callback(call: types.CallbackQuery, state = FSMContext ):
     if call.data == 'open':
         data = await state.get_data() 
-        await state.finish()
         if vk_open(link_transform(data['link'])):
             await call.message.answer(text='Пост открыт!')
+            await MessageData.fin.set()
         else:
-            await call.message.answer(text='Что-то пошло не так!')
+            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'close':
         data = await state.get_data() 
-        await state.finish()
         if vk_close(link_transform(data['link'])):
             await call.message.answer(text='Пост закрыт!')
+            await MessageData.fin.set()
         else:
-            await call.message.answer(text='Что-то пошло не так!')
+            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'delete':
         data = await state.get_data()
+        if vk_delete(link_transform(data['link'])):
+            await call.message.answer(text='Комментарий удален!')
+            await MessageData.fin.set()
+        else:
+            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+    if call.data == 'restore':
+        data = await state.get_data()
+        if vk_restore(link_transform(data['link'])):
+            await call.message.answer(text='Комментарий восстановлен!')
+            await MessageData.fin.set()
+        else:
+            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+    if call.data == 'reboot':
         await state.finish()
-        
+        await call.message.answer(text='Нажмите /start')
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates = True)
