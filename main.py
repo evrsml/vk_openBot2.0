@@ -6,7 +6,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from tokens import VK_TOKEN, TG_TOKEN, GROUP
+from tokens import VK_TOKEN, TG_TOKEN, GROUP, WELCOME_MSG
 import logging
 
 storage = MemoryStorage()
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 vk_api = vk.API(access_token=VK_TOKEN, v= '5.131')
 
-'''функция авторизации. Проверяет состоит ли пользователь в группе'''
+'''Authorization func. Checking if user is a member of group'''
 def user_check(chat_member):
     print(chat_member['status'])
     if chat_member['status'] != 'left' and chat_member['status'] != 'kicked': 
@@ -34,9 +34,8 @@ def user_check(chat_member):
     else:
         return False
 
-'''здесь преобразуем ссылку в нужный формат для ВК апи'''
+'''Convering user's link to a list of values for VK API'''
 def link_transform(link):
-    #global res_id
     res_id = ['','',''] 
     pattern_comment = r"_r+\d+|reply=\d+"
     pattern_post = r"-?\d+_\d+"
@@ -57,6 +56,7 @@ def link_transform(link):
         res_id[2] = result_id_rep[1]
     return res_id
     
+'''VK API methods'''
 def vk_open(data):
     if vk_api.wall.openComments(owner_id = data[0], post_id = data[1]):
         return True
@@ -81,22 +81,22 @@ def vk_restore(data):
     else:
         False
 
+'''FSM class for storing user's link'''
 class MessageData(StatesGroup):
 
     link = State()
     fin = State()
 
+'''/start command handler'''
 @dp.message_handler(commands=['start'])
 async def welcome_msg(message: types.Message):
     if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
-        await bot.send_message(message.from_user.id, text='''Бот умеет открывать, закрывать, удалять и восстанавливать комментарии на следующих страницах Вконтакте:\n 
-Радий Хабиров\n
-Администрация Главы РБ\n
-ЦУР Башкортостан\n\nОтправьте ссылку в ответ, чтобы открыть или закрыть пост''')
+        await bot.send_message(message.from_user.id, text= WELCOME_MSG)
         await MessageData.link.set()
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
+'''Link's handler'''
 @dp.message_handler(Text(startswith='http'), state = MessageData.link)
 async def input_link(message: types.Message, state = FSMContext):
     if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
@@ -107,6 +107,7 @@ async def input_link(message: types.Message, state = FSMContext):
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
+'''Handler for the inline buttons'''
 @dp.callback_query_handler(text=['open','close', 'delete', 'restore', 'reboot'], state = MessageData.fin)
 async def process_callback(call: types.CallbackQuery, state = FSMContext ):
     if call.data == 'open':
