@@ -16,13 +16,13 @@ dp = Dispatcher(bot, storage=MemoryStorage())
    
 btn_open = InlineKeyboardButton('Открыть пост 🗣', callback_data='open')
 btn_close = InlineKeyboardButton('Закрыть пост 🤐', callback_data='close')
-btn_del = InlineKeyboardButton('Удалить комментарий 👮‍♂️', callback_data='delete')
+btn_del = InlineKeyboardButton('Удалить коммент 👮‍♂️', callback_data='delete')
 btn_res =  InlineKeyboardButton('Вернуть коммент 🤕', callback_data='restore')
 btn_res_post = InlineKeyboardButton ('Вернуть пост 😰',callback_data= 'restore_post')
 btn_ban = InlineKeyboardButton('В бан!⛔️', callback_data='ban')
-btn_reboot = InlineKeyboardButton('Отправить другую ссылку 🔄', callback_data='reboot')
+btn_reboot = InlineKeyboardButton('Отправить\nдругую ссылку 🔄', callback_data='reboot')
 
-MENU = InlineKeyboardMarkup().add(btn_open, btn_close, btn_del, btn_res,btn_res_post, btn_reboot, btn_ban)
+MENU = InlineKeyboardMarkup().row(btn_open, btn_close).row(btn_del, btn_res).row(btn_reboot).row(btn_res_post, btn_ban)
 
 #logging.basicConfig(level=logging.DEBUG)
 
