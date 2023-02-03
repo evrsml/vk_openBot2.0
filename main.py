@@ -14,27 +14,28 @@ storage = MemoryStorage()
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
    
-btn_open = InlineKeyboardButton('Открыть пост', callback_data='open')
-btn_close = InlineKeyboardButton('Закрыть пост', callback_data='close')
-btn_del = InlineKeyboardButton('Удалить комментарий', callback_data='delete')
-btn_res =  InlineKeyboardButton('Восстановить коммент', callback_data='restore')
-btn_reboot = InlineKeyboardButton('Отправить другую ссылку', callback_data='reboot')
+btn_open = InlineKeyboardButton('Открыть пост 🗣', callback_data='open')
+btn_close = InlineKeyboardButton('Закрыть пост 🤐', callback_data='close')
+btn_del = InlineKeyboardButton('Удалить комментарий 👮‍♂️', callback_data='delete')
+btn_res =  InlineKeyboardButton('Вернуть коммент 🤕', callback_data='restore')
+btn_res_post = InlineKeyboardButton ('Вернуть пост 😰',callback_data= 'restore_post')
+btn_ban = InlineKeyboardButton('В бан!⛔️', callback_data='ban')
+btn_reboot = InlineKeyboardButton('Отправить другую ссылку 🔄', callback_data='reboot')
 
-MENU = InlineKeyboardMarkup().add(btn_open, btn_close, btn_del, btn_res, btn_reboot)
+MENU = InlineKeyboardMarkup().add(btn_open, btn_close, btn_del, btn_res,btn_res_post, btn_reboot, btn_ban)
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 vk_api = vk.API(access_token=VK_TOKEN, v= '5.131')
 
 '''Authorization func. Checking if user is a member of group'''
 def user_check(chat_member):
-    print(chat_member['status'])
     if chat_member['status'] != 'left' and chat_member['status'] != 'kicked': 
         return True
     else:
         return False
 
-'''Convering user's link to a list of values for VK API'''
+'''Converting user's link to a list of values for VK API'''
 def link_transform(link):
     res_id = ['','',''] 
     pattern_comment = r"_r+\d+|reply=\d+"
@@ -81,6 +82,12 @@ def vk_restore(data):
     else:
         False
 
+def vk_restore_post(data):
+    if vk_api.wall.restore(owner_id = data[0], post_id = data[1]):
+        return True
+    else:
+        False
+
 '''FSM class for storing user's link'''
 class MessageData(StatesGroup):
 
@@ -102,40 +109,46 @@ async def input_link(message: types.Message, state = FSMContext):
     if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
         async with state.proxy() as data:
             data['link'] = message.text
-        await message.answer(text= 'Что сделать?', reply_markup=MENU)
+        await message.answer(text= 'Что сделать? 🤖', reply_markup=MENU)
         await MessageData.next()
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
 '''Handler for the inline buttons'''
-@dp.callback_query_handler(text=['open','close', 'delete', 'restore', 'reboot'], state = MessageData.fin)
+@dp.callback_query_handler(text=['open','close', 'delete', 'restore','restore_post','ban', 'reboot'], state = MessageData.fin)
 async def process_callback(call: types.CallbackQuery, state = FSMContext ):
     if call.data == 'open':
         data = await state.get_data() 
         if vk_open(link_transform(data['link'])):
-            await call.message.answer(text='Пост открыт!')
+            await call.message.answer(text='Пост открыт ✅')
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'close':
         data = await state.get_data() 
         if vk_close(link_transform(data['link'])):
-            await call.message.answer(text='Пост закрыт!')
+            await call.message.answer(text='Пост закрыт ✅')
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'delete':
         data = await state.get_data()
         if vk_delete(link_transform(data['link'])):
-            await call.message.answer(text='Комментарий удален!')
+            await call.message.answer(text='Комментарий удален ✅')
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'restore':
         data = await state.get_data()
         if vk_restore(link_transform(data['link'])):
-            await call.message.answer(text='Комментарий восстановлен!')
+            await call.message.answer(text='Комментарий восстановлен ✅')
             await MessageData.fin.set()
+        else:
+            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+    if call.data == 'restore_post':
+        data = await state.get_data()
+        if vk_restore_post(link_transform(data['link'])):
+            await call.message.answer('Пост восстановлен ✅')
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'reboot':
