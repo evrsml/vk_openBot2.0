@@ -20,12 +20,13 @@ btn_del = InlineKeyboardButton('Удалить коммент 👮‍♂️', ca
 btn_res =  InlineKeyboardButton('Вернуть коммент 🤕', callback_data='restore')
 btn_res_post = InlineKeyboardButton ('Вернуть пост 😰',callback_data= 'restore_post')
 btn_ban = InlineKeyboardButton('В бан!⛔️', callback_data='ban')
+btn_unban = InlineKeyboardButton('Разбан 🔑', callback_data='unban')
 btn_reboot = InlineKeyboardButton('Отправить другую ссылку 🔄', callback_data='reboot')
 
 MENU = InlineKeyboardMarkup().row(btn_open, 
 btn_close).row(btn_del, 
 btn_res).row(btn_reboot).row(btn_res_post, 
-btn_ban)
+btn_ban, btn_unban)
 
 #logging.basicConfig(level=logging.DEBUG)
 
@@ -67,10 +68,8 @@ def screen_name_to_id(link):
     pattern_name = r"\w+(?![https://vk.com/])"
     res_id = re.findall(pattern_id, link)
     res_name = re.findall(pattern_name, link)
-    print(res_name)
     if len(res_id) == 0:
         to_id = vk_api.utils.resolveScreenName(screen_name = res_name[0])
-        print(to_id)
         id = [*to_id.values()]
         user_id[0] = id[0]
     else:
@@ -115,6 +114,12 @@ def vk_ban(data):
     else:
         False
 
+def vk_unban(data):
+    if vk_api.account.unban(owner_id = data[0]):
+        return True
+    else:
+        False
+
 '''FSM class for storing user's link'''
 class MessageData(StatesGroup):
 
@@ -142,7 +147,7 @@ async def input_link(message: types.Message, state = FSMContext):
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
 '''Handler for the inline buttons'''
-@dp.callback_query_handler(text=['open','close', 'delete', 'restore','restore_post','ban', 'reboot'], state = MessageData.fin)
+@dp.callback_query_handler(text=['open','close', 'delete', 'restore','restore_post','ban','unban','reboot'], state = MessageData.fin)
 async def process_callback(call: types.CallbackQuery, state = FSMContext ):
     if call.data == 'open':
         data = await state.get_data() 
@@ -182,6 +187,13 @@ async def process_callback(call: types.CallbackQuery, state = FSMContext ):
         data = await state.get_data()
         if vk_ban(screen_name_to_id(data['link'])):
             await call.message.answer('Забанен! ✅')
+            await MessageData.fin.set()
+        else:
+            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+    if call.data == 'unban':
+        data = await state.get_data()
+        if vk_unban(screen_name_to_id(data['link'])):
+            await call.message.answer('Разбанен! ✅')
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
