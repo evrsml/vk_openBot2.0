@@ -103,14 +103,14 @@ async def process_callback(call: types.CallbackQuery, state = FSMContext ):
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
     if call.data == 'ban':
         data = await state.get_data()
-        if vk_ban(get_comment(link_transform(data['link']))):
-            await call.message.answer('Забанен! ✅')
-            await MessageData.fin.set()
-        elif vk_ban(screen_name_to_id(data['link'])):
+        if data['link'].startswith('https://vk.com/wall'):
+            vk_ban(get_comment(link_transform(data['link'])))
             await call.message.answer('Забанен! ✅')
             await MessageData.fin.set()
         else:
-            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+            vk_ban(screen_name_to_id(data['link']))
+            await call.message.answer('Забанен! ✅')
+            await MessageData.fin.set()
     if call.data == 'unban':
         data = await state.get_data()
         if vk_unban(screen_name_to_id(data['link'])):
