@@ -4,8 +4,10 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from vk.exceptions import VkAPIError
 from tokens import TG_TOKEN, GROUP, WELCOME_MSG
 from vk_logic import *
+
 
 storage = MemoryStorage()
 
@@ -41,9 +43,9 @@ class MessageData(StatesGroup):
 '''/start command handler'''
 @dp.message_handler(commands=['start'])
 async def welcome_msg(message: types.Message):
-    if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):
-        await bot.send_message(message.from_user.id, text= WELCOME_MSG)
-        await MessageData.link.set()
+    if user_check(await bot.get_chat_member(chat_id=GROUP,user_id=message.from_user.id)):   
+            await bot.send_message(message.from_user.id, text= WELCOME_MSG)
+            await MessageData.link.set()
     else:
         await bot.send_message(message.from_user.id,text= 'У вас нет доступа!')
 
@@ -51,6 +53,10 @@ async def welcome_msg(message: types.Message):
 @dp.message_handler(lambda message: not message.text.startswith('http'),state= MessageData.link)
 async def process_link_invalid(message: types.Message):
     return await message.reply('Принимаю только ссылку!')
+
+@dp.message_handler(lambda message: message,state= MessageData.fin)
+async def process_act_invalid(message: types.Message):
+    return await message.reply('Сначала нажми 🔄')
 
 '''Link's handler'''
 @dp.message_handler(Text(startswith='http'), state = MessageData.link)
@@ -81,6 +87,7 @@ async def process_callback(call: types.CallbackQuery, state = FSMContext ):
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+
     if call.data == 'delete':
         data = await state.get_data()
         if vk_delete(link_transform(data['link'])):
@@ -88,6 +95,7 @@ async def process_callback(call: types.CallbackQuery, state = FSMContext ):
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+            
     if call.data == 'restore':
         data = await state.get_data()
         if vk_restore(link_transform(data['link'])):
@@ -95,29 +103,44 @@ async def process_callback(call: types.CallbackQuery, state = FSMContext ):
             await MessageData.fin.set()
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+
     if call.data == 'restore_post':
         data = await state.get_data()
         if vk_restore_post(link_transform(data['link'])):
             await call.message.answer('Пост восстановлен ✅')
         else:
             await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+
     if call.data == 'ban':
         data = await state.get_data()
-        if data['link'].startswith('https://vk.com/wall'):
-            vk_ban(get_comment(link_transform(data['link'])))
-            await call.message.answer('Забанен! ✅')
-            await MessageData.fin.set()
+        try: 
+            if data['link'].startswith('https://vk.com/wall'):
+                vk_ban(get_comment(link_transform(data['link'])))
+                await call.message.answer('Забанен! ✅')
+                await MessageData.fin.set()
+        except VkAPIError:
+                await state.finish()
+                raise VkAPIError(await call.message.answer('''Что-то не так!\nНажмите /start и отправьте прямую ссылку на аккаунт''')) 
         else:
             vk_ban(screen_name_to_id(data['link']))
             await call.message.answer('Забанен! ✅')
             await MessageData.fin.set()
+
     if call.data == 'unban':
         data = await state.get_data()
-        if vk_unban(screen_name_to_id(data['link'])):
+        try:   
+            if data['link'].startswith('https://vk.com/wall'):
+                vk_unban(get_comment(link_transform(data['link'])))
+                await call.message.answer('Разбанен! ✅')
+                await MessageData.fin.set()
+        except VkAPIError:
+                await state.finish()
+                raise VkAPIError(await call.message.answer('''Что-то не так!\nНажмите /start отправьте прямую ссылку на аккаунт'''))
+        else:
+            vk_unban(screen_name_to_id(data['link']))
             await call.message.answer('Разбанен! ✅')
             await MessageData.fin.set()
-        else:
-            await call.message.answer(text='Что-то пошло не так!\nЧтобы продолжить нажмите /start')
+
     if call.data == 'reboot':
         await state.finish()
         await call.message.answer(text='Нажмите /start')
